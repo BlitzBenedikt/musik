@@ -15,14 +15,16 @@
 <body>
     <h1>Zufällige atonale Tonreihenfolge</h1>
     <button onclick="generateTones()">Neue Reihenfolge generieren</button>
+    <button onclick="playSequence()">Reihenfolge abspielen</button>
     <div id="tone-list"></div>
 
     <script>
         const tones = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"];
         const forbiddenIntervals = [[0, 1], [0, 4], [0, 7], [0, 12], [0, 2], [0, 10]];
-        
+
         let currentAudio = null;
-        const audioCache = {}; // Cache für die vorab geladenen Audiodateien
+        const audioCache = {};
+        let currentSequence = []; // Variable für die aktuelle Tonreihenfolge
 
         // Preload die Audiodateien
         function preloadAudios() {
@@ -50,6 +52,7 @@
                 shuffled = [...tones].sort(() => Math.random() - 0.5);
             } while (!isValidSequence(shuffled));
             
+            currentSequence = shuffled; // Speichere die aktuelle Reihenfolge
             const toneListDiv = document.getElementById("tone-list");
             toneListDiv.innerHTML = "";
             shuffled.forEach(tone => {
@@ -67,11 +70,18 @@
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
             }
-            currentAudio = audioCache[tone]; // Verwende das vorab geladene Audio aus dem Cache
+            currentAudio = audioCache[tone];
             currentAudio.play();
         }
 
-        // Rufe das Preload beim Laden der Seite auf
+        function playSequence() {
+            let delay = 0;
+            currentSequence.forEach(tone => {
+                setTimeout(() => playTone(tone), delay);
+                delay += 1000; // 1 Sekunde Verzögerung zwischen den Tönen
+            });
+        }
+
         window.onload = preloadAudios;
     </script>
 </body>
