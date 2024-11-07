@@ -16,6 +16,7 @@
     <h1>Zufällige atonale Tonreihenfolge</h1>
     <button onclick="generateTones()">Neue Reihenfolge generieren</button>
     <button onclick="playSequence()">Reihenfolge abspielen</button>
+    <button onclick="stopPlayback()">Stop</button>
     <div id="tone-list"></div>
 
     <script>
@@ -25,6 +26,7 @@
         let currentAudio = null;
         const audioCache = {};
         let currentSequence = []; // Variable für die aktuelle Tonreihenfolge
+        let sequenceTimeouts = []; // Speichert Zeitgeber für die Reihenfolge-Wiedergabe
 
         // Preload die Audiodateien
         function preloadAudios() {
@@ -75,11 +77,25 @@
         }
 
         function playSequence() {
+            stopPlayback(); // Stoppt alle laufenden Töne und Timer, bevor die neue Sequenz beginnt
             let delay = 0;
             currentSequence.forEach(tone => {
-                setTimeout(() => playTone(tone), delay);
+                const timeout = setTimeout(() => playTone(tone), delay);
+                sequenceTimeouts.push(timeout); // Speichere jeden Timer, um ihn bei Bedarf zu stoppen
                 delay += 1000; // 1 Sekunde Verzögerung zwischen den Tönen
             });
+        }
+
+        function stopPlayback() {
+            // Stoppe das aktuelle Audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+            }
+            // Stoppe alle Zeitgeber für die Sequenz-Wiedergabe
+            sequenceTimeouts.forEach(timeout => clearTimeout(timeout));
+            sequenceTimeouts = []; // Zurücksetzen des Zeitgeber-Arrays
         }
 
         window.onload = preloadAudios;
