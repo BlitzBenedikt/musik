@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zufällige atonale Tonreihenfolge</title>
+    <title>Töne anordnen und überprüfen</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,7 +15,7 @@
             background-color: #f9f9f9;
             color: #333;
         }
-        #controls, #tone-list {
+        #controls, #tone-list, #play-settings {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
@@ -24,8 +24,9 @@
             max-width: 600px;
         }
         #tone-list {
-            display: none; /* Versteckt, bis eine Sequenz generiert wird */
+            display: grid;
             grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 10px;
         }
         button {
             padding: 10px 20px;
@@ -49,203 +50,216 @@
         .secondary:hover {
             background-color: #565e64;
         }
-        #settings {
-            display: flex;
-            gap: 10px;
-            flex-direction: column;
-            align-items: center;
+        .invalid {
+            background-color: #FF0000;
+            color: white;
         }
-        label {
-            font-size: 0.9em;
+        .draggable {
+            padding: 10px;
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            text-align: center;
+            cursor: move;
+            user-select: none;
         }
         input[type="number"] {
             padding: 5px;
             font-size: 1em;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 100px;
-            text-align: center;
+            width: 80px;
         }
     </style>
 </head>
 <body>
-    <h1>Zufällige atonale Tonreihenfolge</h1>
-
-    <div id="settings">
-        <label>
-            Wiedergabegeschwindigkeit (ms):
-            <input type="number" id="play-delay" value="1000" min="100" />
-        </label>
-        <button class="primary" onclick="updateSettings()">Einstellungen übernehmen</button>
-    </div>
+    <h1>Töne anordnen und überprüfen</h1>
 
     <div id="controls">
-        <button class="primary" onclick="generateTones()">Neue Reihenfolge generieren</button>
+        <button class="primary" onclick="generateTones()">Neue Töne laden</button>
+        <button class="primary" onclick="playSequence()">Reihenfolge abspielen</button>
+        <button class="secondary" onclick="stopPlayback()">Stopp</button>
+        <button class="primary" onclick="validateSequence()">Gültigkeit überprüfen</button>
+    </div>
+
+    <div id="play-settings">
+        <label for="play-delay">Zeit pro Ton (ms):</label>
+        <input type="number" id="play-delay" value="1000" min="100">
     </div>
 
     <div id="tone-list"></div>
 
     <script>
-        const SEMITONES_IN_OCTAVE = 12;
-        let PLAY_DELAY_MS = 1000;
-
         const tones = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"];
-        const forbiddenIntervalPairs = [[3, 3], [4, 4],[4,3],[3,4]]; // Verbotene Kombinationen von Intervallen
-
-        let currentAudio = null;
-        const audioCache = {};
+        const forbiddenIntervalPairs = [[3, 3], [4, 4],[3,4],[4,3]]; // Verbotene Kombinationen von Intervallen
         let currentSequence = [];
-        let sequenceTimeouts = [];
+        const audioCache = {};
+        let playbackTimeouts = [];
 
-        // Preload Audiodateien
-        async function preloadAudios() {
-            const promises = tones.map(tone => {
-                return new Promise(resolve => {
-                    const audio = new Audio(`${tone.replace('#', 'sharp')}.wav`);
-                    audio.oncanplaythrough = () => resolve(audio);
-                    audioCache[tone] = audio;
-                });
+        // Audios vorladen
+        function preloadAudios() {
+            tones.forEach(tone => {
+                const audio = new Audio(`${tone.replace('#', 'sharp')}.wav`);
+                audioCache[tone] = audio;
             });
-            await Promise.all(promises);
-            console.log("Alle Audiodateien wurden vorab geladen.");
         }
 
-        // Berechne das Intervall zwischen zwei Tönen
+        // Generiert eine zufällige Reihenfolge der Töne
+        function generateTones() {
+            const shuffled = [...tones].sort(() => Math.random() - 0.5);
+            currentSequence = shuffled;
+            displayTones(shuffled);
+            console.clear();
+            console.log("Neue Tonfolge generiert:", shuffled);
+
+            // Überprüft direkt nach Generierung die Reihenfolge
+            validateSequence();
+        }
+
+        // Zeigt die Töne an, die der Benutzer per Drag & Drop anordnen kann
+        function displayTones(sequence) {
+            const toneListDiv = document.getElementById("tone-list");
+            toneListDiv.innerHTML = "";
+
+            sequence.forEach((tone, index) => {
+                const div = document.createElement("div");
+                div.className = "draggable";
+                div.innerText = tone;
+                div.draggable = true;
+                div.dataset.index = index;
+
+                // Drag & Drop Events
+                div.addEventListener("dragstart", dragStart);
+                div.addEventListener("dragover", dragOver);
+                div.addEventListener("drop", drop);
+                div.addEventListener("dragend", dragEnd);
+
+                div.addEventListener("click", () => playTone(tone));
+                toneListDiv.appendChild(div);
+            });
+        }
+
+        // Drag & Drop Logik
+        let draggedElement = null;
+
+        function dragStart(event) {
+            draggedElement = event.target;
+            event.dataTransfer.effectAllowed = "move";
+        }
+
+        function dragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        function drop(event) {
+            event.preventDefault();
+            const target = event.target;
+
+            if (target && target !== draggedElement && target.classList.contains("draggable")) {
+                const toneListDiv = document.getElementById("tone-list");
+                const children = Array.from(toneListDiv.children);
+                const draggedIndex = children.indexOf(draggedElement);
+                const targetIndex = children.indexOf(target);
+
+                if (draggedIndex < targetIndex) {
+                    toneListDiv.insertBefore(draggedElement, target.nextSibling);
+                } else {
+                    toneListDiv.insertBefore(draggedElement, target);
+                }
+            }
+        }
+
+        function dragEnd() {
+            draggedElement = null;
+            updateCurrentSequence();
+        }
+
+        // Aktualisiert die Reihenfolge der Töne basierend auf der Benutzeranordnung
+        function updateCurrentSequence() {
+            const toneListDiv = document.getElementById("tone-list");
+            currentSequence = Array.from(toneListDiv.children).map(child => child.innerText);
+        }
+
+        // Berechnet das Intervall zwischen zwei Tönen
         function calculateInterval(note1, note2) {
             const index1 = tones.indexOf(note1);
             const index2 = tones.indexOf(note2);
-            return (index2 - index1 + SEMITONES_IN_OCTAVE) % SEMITONES_IN_OCTAVE;
+            return (index2 - index1 + tones.length) % tones.length;
         }
 
-        // Prüft, ob die Sequenz gültig ist (keine verbotenen Intervallpaare)
-        function isValidSequence(sequence) {
-            let debugOutput = "";
-            for (let i = 0; i < sequence.length - 2; i++) {
-                const interval1 = calculateInterval(sequence[i], sequence[i + 1]);
-                const interval2 = calculateInterval(sequence[i + 1], sequence[i + 2]);
-                debugOutput += `Überprüfte Intervalle: (${interval1}, ${interval2})\n`; // Debug-Ausgabe
+        // Überprüft, ob die Reihenfolge gültig ist
+        function validateSequence() {
+            let isValid = true;
+            const toneListDiv = document.getElementById("tone-list");
+            const toneElements = Array.from(toneListDiv.children);
+
+            // Entfernt vorherige Hervorhebungen
+            toneElements.forEach(element => {
+                element.classList.remove("invalid");
+            });
+
+            console.clear();
+            console.log("Überprüfung der Reihenfolge:", currentSequence);
+
+            for (let i = 0; i < currentSequence.length - 2; i++) {
+                const interval1 = calculateInterval(currentSequence[i], currentSequence[i + 1]);
+                const interval2 = calculateInterval(currentSequence[i + 1], currentSequence[i + 2]);
+
+                console.log(`Intervalle zwischen ${currentSequence[i]}, ${currentSequence[i + 1]}, ${currentSequence[i + 2]}: ${interval1}, ${interval2}`);
+
                 if (forbiddenIntervalPairs.some(pair => pair[0] === interval1 && pair[1] === interval2)) {
-                    debugOutput += `Verbotenes Intervallpaar gefunden: (${interval1}, ${interval2})\n`;
-                    console.log(debugOutput); // Ausgabe der Debugging-Informationen ins Terminal
-                    return false;
+                    isValid = false;
+                    // Markiere die betroffenen Töne rot
+                    toneElements[i].classList.add("invalid");
+                    toneElements[i + 1].classList.add("invalid");
+                    toneElements[i + 2].classList.add("invalid");
                 }
             }
-            console.log(debugOutput); // Ausgabe der Debugging-Informationen ins Terminal
-            return true;
+
+            if (isValid) {
+                console.log("Die Reihenfolge ist gültig.");
+                alert("Die Reihenfolge ist gültig!");
+            } else {
+                console.warn("Es wurden verbotene Intervalle gefunden.");
+                alert("Es wurden verbotene Intervalle gefunden. Die betroffenen Töne wurden rot markiert.");
+            }
         }
 
-        // Generiere eine gültige zufällige Tonfolge
-        function generateTones() {
-            const MAX_ATTEMPTS = 1000;
-            let shuffled, attempts = 0;
+        // Spielt einen Ton ab
+        function playTone(tone) {
+            const audio = audioCache[tone];
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play();
+            }
+        }
 
-            do {
-                shuffled = [...tones].sort(() => Math.random() - 0.5);
-                attempts++;
-            } while (!isValidSequence(shuffled) && attempts < MAX_ATTEMPTS);
+        // Spielt die gesamte Reihenfolge ab
+        function playSequence() {
+            stopPlayback();
 
-            if (attempts >= MAX_ATTEMPTS) {
-                alert("Es konnte keine gültige Reihenfolge generiert werden.");
+            const delay = parseInt(document.getElementById("play-delay").value, 10);
+            if (isNaN(delay) || delay <= 0) {
+                alert("Bitte eine gültige Verzögerung in Millisekunden eingeben!");
                 return;
             }
 
-            currentSequence = shuffled;
-            displaySequence();
-            updateControls(true);
-        }
-
-        // Zeigt die aktuelle Sequenz auf der Seite an
-        function displaySequence() {
-            const toneListDiv = document.getElementById("tone-list");
-            toneListDiv.style.display = "grid";
-            toneListDiv.innerHTML = "";
-            currentSequence.forEach(tone => {
-                const index = tones.indexOf(tone) + 1;
-                const button = document.createElement("button");
-                button.innerText = `${index}. ${tone}`;
-                button.className = "secondary tone-button";
-                button.onclick = () => playTone(tone);
-                toneListDiv.appendChild(button);
-            });
-        }
-
-        // Spiele einen einzelnen Ton
-        function playTone(tone) {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-            }
-            currentAudio = audioCache[tone];
-            currentAudio.play();
-        }
-
-        // Spiele die gesamte Sequenz
-        function playSequence() {
-            stopPlayback();
-            let delay = 0;
-            currentSequence.forEach(tone => {
-                const timeout = setTimeout(() => playTone(tone), delay);
-                sequenceTimeouts.push(timeout);
-                delay += PLAY_DELAY_MS;
+            console.log("Abspielen der Reihenfolge mit Verzögerung:", delay, "ms");
+            currentSequence.forEach((tone, index) => {
+                const timeout = setTimeout(() => playTone(tone), delay * index);
+                playbackTimeouts.push(timeout);
             });
         }
 
         // Stoppt die Wiedergabe
         function stopPlayback() {
-            for (let tone in audioCache) {
-                const audio = audioCache[tone];
-                audio.pause();
-                audio.currentTime = 0;
-            }
-            sequenceTimeouts.forEach(timeout => clearTimeout(timeout));
-            sequenceTimeouts = [];
-            currentAudio = null;
+            playbackTimeouts.forEach(timeout => clearTimeout(timeout));
+            playbackTimeouts = [];
+            console.log("Wiedergabe gestoppt.");
         }
 
-        // Aktualisiert die Wiedergabeeinstellungen
-        function updateSettings() {
-            const playDelayInput = document.getElementById("play-delay");
-            const newDelay = parseInt(playDelayInput.value, 10);
-            if (newDelay >= 100) {
-                PLAY_DELAY_MS = newDelay;
-                alert(`Neue Wiedergabegeschwindigkeit: ${PLAY_DELAY_MS}ms`);
-            } else {
-                alert("Die Geschwindigkeit muss mindestens 100ms betragen.");
-            }
-        }
-
-        // Aktualisiert die Steuerungsbuttons basierend auf dem Status
-        function updateControls(sequenceGenerated) {
-            const controlsDiv = document.getElementById("controls");
-            controlsDiv.innerHTML = "";
-
-            // Button für "Neue Reihenfolge generieren" bleibt immer sichtbar
-            const generateButton = document.createElement("button");
-            generateButton.className = "primary";
-            generateButton.innerText = "Neue Reihenfolge generieren";
-            generateButton.onclick = generateTones;
-            controlsDiv.appendChild(generateButton);
-
-            // Wenn eine Sequenz generiert wurde, erscheinen zusätzliche Buttons
-            if (sequenceGenerated) {
-                const playButton = document.createElement("button");
-                playButton.className = "primary";
-                playButton.innerText = "Reihenfolge abspielen";
-                playButton.onclick = playSequence;
-                controlsDiv.appendChild(playButton);
-
-                const stopButton = document.createElement("button");
-                stopButton.className = "secondary";
-                stopButton.innerText = "Stop";
-                stopButton.onclick = stopPlayback;
-                controlsDiv.appendChild(stopButton);
-            }
-        }
-
-        // Preload Audios bei Seitenladung
+        // Seite initialisieren
         window.onload = () => {
             preloadAudios();
-            updateControls(false);
+            generateTones();
         };
     </script>
 </body>
