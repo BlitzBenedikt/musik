@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Töne anordnen und überprüfen</title>
+    <title>Zwölftonreihe - Transformationen</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,7 +21,7 @@
             flex-wrap: wrap;
             justify-content: center;
             width: 100%;
-            max-width: 600px;
+            max-width: 800px;
         }
         #tone-list {
             display: grid;
@@ -50,9 +50,12 @@
         .secondary:hover {
             background-color: #565e64;
         }
+        .result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
         .invalid {
-            background-color: #FF0000;
-            color: white;
+            background-color: #FFCCCC;
         }
         .draggable {
             padding: 10px;
@@ -70,13 +73,16 @@
     </style>
 </head>
 <body>
-    <h1>Töne anordnen und überprüfen</h1>
+    <h1>Zwölftonreihe - Transformationen</h1>
 
     <div id="controls">
         <button class="primary" onclick="generateTones()">Neue Töne laden</button>
         <button class="primary" onclick="playSequence()">Reihenfolge abspielen</button>
         <button class="secondary" onclick="stopPlayback()">Stopp</button>
         <button class="primary" onclick="validateSequence()">Gültigkeit überprüfen</button>
+        <button class="secondary" onclick="applyKrebs()">Krebs</button>
+        <button class="secondary" onclick="applyUmkehrung()">Umkehrung</button>
+        <button class="secondary" onclick="applyKrebsUmkehrung()">Krebs-Umkehrung</button>
     </div>
 
     <div id="play-settings">
@@ -85,15 +91,15 @@
     </div>
 
     <div id="tone-list"></div>
+    <div id="transformation-result" class="result"></div>
 
     <script>
         const tones = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"];
-        const forbiddenIntervalPairs = [[3, 3], [4, 4],[3,4],[4,3]]; // Verbotene Kombinationen von Intervallen
+        const forbiddenIntervalPairs = [[3, 3], [4, 4], [3, 4], [4, 3]];
         let currentSequence = [];
-        const audioCache = {};
         let playbackTimeouts = [];
+        const audioCache = {};
 
-        // Audios vorladen
         function preloadAudios() {
             tones.forEach(tone => {
                 const audio = new Audio(`${tone.replace('#', 'sharp')}.wav`);
@@ -101,23 +107,15 @@
             });
         }
 
-        // Generiert eine zufällige Reihenfolge der Töne
         function generateTones() {
-            const shuffled = [...tones].sort(() => Math.random() - 0.5);
-            currentSequence = shuffled;
-            displayTones(shuffled);
-            console.clear();
-            console.log("Neue Tonfolge generiert:", shuffled);
-
-            // Überprüft direkt nach Generierung die Reihenfolge
-            validateSequence();
+            currentSequence = [...tones].sort(() => Math.random() - 0.5);
+            displayTones(currentSequence);
+            displayTransformation("Original", currentSequence);
         }
 
-        // Zeigt die Töne an, die der Benutzer per Drag & Drop anordnen kann
         function displayTones(sequence) {
             const toneListDiv = document.getElementById("tone-list");
             toneListDiv.innerHTML = "";
-
             sequence.forEach((tone, index) => {
                 const div = document.createElement("div");
                 div.className = "draggable";
@@ -125,18 +123,46 @@
                 div.draggable = true;
                 div.dataset.index = index;
 
-                // Drag & Drop Events
                 div.addEventListener("dragstart", dragStart);
                 div.addEventListener("dragover", dragOver);
                 div.addEventListener("drop", drop);
                 div.addEventListener("dragend", dragEnd);
-
                 div.addEventListener("click", () => playTone(tone));
                 toneListDiv.appendChild(div);
             });
         }
 
-        // Drag & Drop Logik
+        function displayTransformation(type, sequence) {
+            const resultDiv = document.getElementById("transformation-result");
+            resultDiv.innerText = `${type}: ${sequence.join(" - ")}`;
+        }
+
+        function applyKrebs() {
+            const krebs = [...currentSequence].reverse();
+            displayTransformation("Krebs", krebs);
+        }
+
+        function applyUmkehrung() {
+            const firstToneIndex = tones.indexOf(currentSequence[0]);
+            const umkehrung = currentSequence.map(tone => {
+                const interval = (tones.indexOf(tone) - firstToneIndex + tones.length) % tones.length;
+                const mirroredIndex = (firstToneIndex - interval + tones.length) % tones.length;
+                return tones[mirroredIndex];
+            });
+            displayTransformation("Umkehrung", umkehrung);
+        }
+
+        function applyKrebsUmkehrung() {
+            const firstToneIndex = tones.indexOf(currentSequence[0]);
+            const umkehrung = currentSequence.map(tone => {
+                const interval = (tones.indexOf(tone) - firstToneIndex + tones.length) % tones.length;
+                const mirroredIndex = (firstToneIndex - interval + tones.length) % tones.length;
+                return tones[mirroredIndex];
+            });
+            const krebsUmkehrung = [...umkehrung].reverse();
+            displayTransformation("Krebs-Umkehrung", krebsUmkehrung);
+        }
+
         let draggedElement = null;
 
         function dragStart(event) {
@@ -152,7 +178,6 @@
         function drop(event) {
             event.preventDefault();
             const target = event.target;
-
             if (target && target !== draggedElement && target.classList.contains("draggable")) {
                 const toneListDiv = document.getElementById("tone-list");
                 const children = Array.from(toneListDiv.children);
@@ -172,42 +197,27 @@
             updateCurrentSequence();
         }
 
-        // Aktualisiert die Reihenfolge der Töne basierend auf der Benutzeranordnung
         function updateCurrentSequence() {
             const toneListDiv = document.getElementById("tone-list");
             currentSequence = Array.from(toneListDiv.children).map(child => child.innerText);
         }
 
-        // Berechnet das Intervall zwischen zwei Tönen
-        function calculateInterval(note1, note2) {
-            const index1 = tones.indexOf(note1);
-            const index2 = tones.indexOf(note2);
-            return (index2 - index1 + tones.length) % tones.length;
-        }
-
-        // Überprüft, ob die Reihenfolge gültig ist
         function validateSequence() {
             let isValid = true;
             const toneListDiv = document.getElementById("tone-list");
             const toneElements = Array.from(toneListDiv.children);
 
-            // Entfernt vorherige Hervorhebungen
             toneElements.forEach(element => {
                 element.classList.remove("invalid");
             });
-
-            console.clear();
-            console.log("Überprüfung der Reihenfolge:", currentSequence);
 
             for (let i = 0; i < currentSequence.length - 2; i++) {
                 const interval1 = calculateInterval(currentSequence[i], currentSequence[i + 1]);
                 const interval2 = calculateInterval(currentSequence[i + 1], currentSequence[i + 2]);
 
                 console.log(`Intervalle zwischen ${currentSequence[i]}, ${currentSequence[i + 1]}, ${currentSequence[i + 2]}: ${interval1}, ${interval2}`);
-
                 if (forbiddenIntervalPairs.some(pair => pair[0] === interval1 && pair[1] === interval2)) {
                     isValid = false;
-                    // Markiere die betroffenen Töne rot
                     toneElements[i].classList.add("invalid");
                     toneElements[i + 1].classList.add("invalid");
                     toneElements[i + 2].classList.add("invalid");
@@ -219,11 +229,16 @@
                 alert("Die Reihenfolge ist gültig!");
             } else {
                 console.warn("Es wurden verbotene Intervalle gefunden.");
-                alert("Es wurden verbotene Intervalle gefunden. Die betroffenen Töne wurden rot markiert.");
+                alert("Es wurden verbotene Intervalle gefunden.");
             }
         }
 
-        // Spielt einen Ton ab
+        function calculateInterval(note1, note2) {
+            const index1 = tones.indexOf(note1);
+            const index2 = tones.indexOf(note2);
+            return (index2 - index1 + tones.length) % tones.length;
+        }
+
         function playTone(tone) {
             const audio = audioCache[tone];
             if (audio) {
@@ -232,16 +247,9 @@
             }
         }
 
-        // Spielt die gesamte Reihenfolge ab
         function playSequence() {
             stopPlayback();
-
             const delay = parseInt(document.getElementById("play-delay").value, 10);
-            if (isNaN(delay) || delay <= 0) {
-                alert("Bitte eine gültige Verzögerung in Millisekunden eingeben!");
-                return;
-            }
-
             console.log("Abspielen der Reihenfolge mit Verzögerung:", delay, "ms");
             currentSequence.forEach((tone, index) => {
                 const timeout = setTimeout(() => playTone(tone), delay * index);
@@ -249,14 +257,12 @@
             });
         }
 
-        // Stoppt die Wiedergabe
         function stopPlayback() {
             playbackTimeouts.forEach(timeout => clearTimeout(timeout));
             playbackTimeouts = [];
             console.log("Wiedergabe gestoppt.");
         }
 
-        // Seite initialisieren
         window.onload = () => {
             preloadAudios();
             generateTones();
