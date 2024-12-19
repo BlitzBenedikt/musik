@@ -55,15 +55,15 @@
             font-weight: bold;
         }
         .invalid {
-            background-color: #FFCCCC;
+            background-color: red !important;
         }
         .draggable {
             padding: 10px;
             background-color: #e0e0e0;
             border: 1px solid #ccc;
             text-align: center;
-            cursor: move;
             user-select: none;
+            touch-action: none;
         }
         input[type="number"] {
             padding: 5px;
@@ -99,6 +99,7 @@
         let currentSequence = [];
         let playbackTimeouts = [];
         const audioCache = {};
+        let currentAudio = null;
 
         function preloadAudios() {
             tones.forEach(tone => {
@@ -111,6 +112,7 @@
             currentSequence = [...tones].sort(() => Math.random() - 0.5);
             displayTones(currentSequence);
             displayTransformation("Original", currentSequence);
+            console.log("Neue Töne geladen:", currentSequence);
         }
 
         function displayTones(sequence) {
@@ -123,11 +125,21 @@
                 div.draggable = true;
                 div.dataset.index = index;
 
+                // Drag & Drop Events (Desktop)
                 div.addEventListener("dragstart", dragStart);
                 div.addEventListener("dragover", dragOver);
                 div.addEventListener("drop", drop);
                 div.addEventListener("dragend", dragEnd);
-                div.addEventListener("click", () => playTone(tone));
+
+                // Touch-Events (für iPad)
+                div.addEventListener("touchstart", touchStart, { passive: false });
+                div.addEventListener("touchmove", touchMove, { passive: false });
+                div.addEventListener("touchend", touchEnd, { passive: false });
+
+                div.addEventListener("click", () => {
+                    playTone(tone);
+                    console.log("Ton abgespielt:", tone);
+                });
                 toneListDiv.appendChild(div);
             });
         }
@@ -135,6 +147,7 @@
         function displayTransformation(type, sequence) {
             const resultDiv = document.getElementById("transformation-result");
             resultDiv.innerText = `${type}: ${sequence.join(" - ")}`;
+            console.log(`${type} angewendet:`, sequence);
         }
 
         function applyKrebs() {
@@ -168,6 +181,7 @@
         function dragStart(event) {
             draggedElement = event.target;
             event.dataTransfer.effectAllowed = "move";
+            console.log("Drag gestartet:", draggedElement.innerText);
         }
 
         function dragOver(event) {
@@ -189,17 +203,19 @@
                 } else {
                     toneListDiv.insertBefore(draggedElement, target);
                 }
+                console.log("Drop ausgeführt von", draggedElement.innerText, "zu", target.innerText);
+                updateCurrentSequence();
             }
         }
 
         function dragEnd() {
             draggedElement = null;
-            updateCurrentSequence();
         }
 
         function updateCurrentSequence() {
             const toneListDiv = document.getElementById("tone-list");
             currentSequence = Array.from(toneListDiv.children).map(child => child.innerText);
+            console.log("Aktuelle Reihenfolge nach Drag & Drop:", currentSequence);
         }
 
         function validateSequence() {
@@ -228,8 +244,8 @@
                 console.log("Die Reihenfolge ist gültig.");
                 alert("Die Reihenfolge ist gültig!");
             } else {
-                console.warn("Es wurden verbotene Intervalle gefunden.");
-                alert("Es wurden verbotene Intervalle gefunden.");
+                console.warn("Es wurden verbotene Intervalle gefunden. Die ungültigen Töne sind markiert.");
+                alert("Es wurden verbotene Intervalle gefunden. Die ungültigen Töne sind markiert.");
             }
         }
 
@@ -240,19 +256,27 @@
         }
 
         function playTone(tone) {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
             const audio = audioCache[tone];
             if (audio) {
-                audio.currentTime = 0;
-                audio.play();
+                currentAudio = audio;
+                currentAudio.currentTime = 0;
+                currentAudio.play();
             }
         }
 
         function playSequence() {
             stopPlayback();
             const delay = parseInt(document.getElementById("play-delay").value, 10);
-            console.log("Abspielen der Reihenfolge mit Verzögerung:", delay, "ms");
+            console.log("Reihenfolge abspielen mit Verzögerung:", delay, "ms");
             currentSequence.forEach((tone, index) => {
-                const timeout = setTimeout(() => playTone(tone), delay * index);
+                const timeout = setTimeout(() => {
+                    playTone(tone);
+                    console.log("Ton abgespielt in Sequenz:", tone);
+                }, delay * index);
                 playbackTimeouts.push(timeout);
             });
         }
@@ -260,7 +284,91 @@
         function stopPlayback() {
             playbackTimeouts.forEach(timeout => clearTimeout(timeout));
             playbackTimeouts = [];
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+            }
             console.log("Wiedergabe gestoppt.");
+        }
+
+        // --- Touch-basierte Drag-Funktionalität ---
+        let touchDraggedElement = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let originalIndex = -1;
+
+        function touchStart(e) {
+            e.preventDefault();
+            const target = e.target;
+            if (target.classList.contains("draggable")) {
+                touchDraggedElement = target;
+                const rect = target.getBoundingClientRect();
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+
+                target.style.position = "absolute";
+                target.style.zIndex = "9999";
+                target.style.width = rect.width + "px";
+                target.style.height = rect.height + "px";
+                target.style.left = rect.left + "px";
+                target.style.top = rect.top + "px";
+                originalIndex = Array.from(document.getElementById("tone-list").children).indexOf(target);
+
+                console.log("Touchstart auf:", target.innerText);
+            }
+        }
+
+        function touchMove(e) {
+            if (!touchDraggedElement) return;
+            e.preventDefault();
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+            touchDraggedElement.style.left = (touchDraggedElement.offsetLeft + dx) + "px";
+            touchDraggedElement.style.top = (touchDraggedElement.offsetTop + dy) + "px";
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }
+
+        function touchEnd(e) {
+            if (!touchDraggedElement) return;
+            e.preventDefault();
+            const toneListDiv = document.getElementById("tone-list");
+            const children = Array.from(toneListDiv.children);
+            let dropIndex = children.length;
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (child !== touchDraggedElement) {
+                    const rect = child.getBoundingClientRect();
+                    if (touchStartX >= rect.left && touchStartX <= rect.right && touchStartY >= rect.top && touchStartY <= rect.bottom) {
+                        dropIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            touchDraggedElement.style.position = "";
+            touchDraggedElement.style.zIndex = "";
+            touchDraggedElement.style.width = "";
+            touchDraggedElement.style.height = "";
+            touchDraggedElement.style.left = "";
+            touchDraggedElement.style.top = "";
+
+            const oldIndex = originalIndex;
+            const elementToMove = children[oldIndex];
+            if (elementToMove && dropIndex !== oldIndex) {
+                toneListDiv.removeChild(elementToMove);
+                if (dropIndex >= children.length) {
+                    toneListDiv.appendChild(elementToMove);
+                } else {
+                    toneListDiv.insertBefore(elementToMove, children[dropIndex]);
+                }
+                console.log("Element per Touch verschoben von Index", oldIndex, "zu Index", dropIndex);
+                updateCurrentSequence();
+            }
+
+            touchDraggedElement = null;
+            originalIndex = -1;
         }
 
         window.onload = () => {
