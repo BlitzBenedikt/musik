@@ -302,6 +302,11 @@
     <div id="transformation-result" class="result"></div>
 </div>
 
+<div id="history-section" style="width:100%;max-width:800px;margin:24px auto 0;">
+    <h3>Verlauf</h3>
+    <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
     <script>
         const tones = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"];
         const forbiddenIntervalPairs = [[3, 3], [4, 4], [3, 4], [4, 3]];
@@ -310,6 +315,8 @@
         const audioCache = {};
         let currentAudio = null;
         let currentTransformationSequence = [];
+
+        let history = []; // Verlauf der Reihen
 
         function preloadAudios() {
             tones.forEach(tone => {
@@ -327,7 +334,8 @@
                 tries++;
             }
             displayTones(currentSequence);
-            displayTransformation("Original", currentSequence);
+            displayTransformation("Original", currentSequence); // <-- das reicht!
+    updateHistoryView();
             if (isInitial) {
                 console.log("Erste gültige Zwölftonreihe geladen:", currentSequence);
             } else {
@@ -394,6 +402,8 @@
             const resultDiv = document.getElementById("transformation-result");
             resultDiv.innerText = `${type}: ${sequence.join(" - ")}`;
             currentTransformationSequence = sequence; // Speichern!
+            history.unshift({ type, row: [...sequence] }); // <-- KORREKT!
+    updateHistoryView();
             console.log(`${type} angewendet:`, sequence);
         }
 
@@ -471,6 +481,8 @@
         function updateCurrentSequence() {
             const toneListDiv = document.getElementById("tone-list");
             currentSequence = Array.from(toneListDiv.children).map(child => child.innerText);
+            history.unshift({ type: "Manuell", row: [...currentSequence] }); // <-- KORREKT!
+    updateHistoryView();
             console.log("Aktuelle Reihenfolge nach Drag & Drop:", currentSequence);
         }
 
@@ -591,14 +603,12 @@
         currentAudio.pause();
         currentAudio.currentTime = 0;
     }
-    const audio = audioCache[tone];
-    if (audio) {
-        currentAudio = audio;
-        audio.currentTime = 0;
-        audio.play();
-    } else {
-        console.warn("Kein Audio für Ton gefunden:", tone);
-    }
+    // Audio-Objekt immer neu erzeugen (iOS-kompatibel)
+    currentAudio = new Audio(`${tone.replace('#', 'sharp')}.wav`);
+    currentAudio.currentTime = 0;
+    currentAudio.play().catch(e => {
+        console.warn("Audio konnte nicht abgespielt werden:", e);
+    });
 }
 
         // --- Touch-basierte Drag-Funktionalität ---
@@ -693,10 +703,35 @@
 
 function saveTransformationAsOriginal() {
     if (!currentTransformationSequence || currentTransformationSequence.length === 0) return;
-    currentSequence = [...currentTransformationSequence];
+    // Nur Verlauf aktualisieren und UI updaten, KEIN displayTransformation mehr!
+    history.unshift({ type: "Original", row: [...currentTransformationSequence] });
+    updateHistoryView();
+    // Die oberste Reihe wird zur aktuellen Reihe
+    currentSequence = [...history[0].row];
     displayTones(currentSequence);
-    displayTransformation("Original", currentSequence);
+    // Zeige die aktuelle Transformation als Original im Ergebnisfeld an, aber OHNE erneut zu speichern!
+    const resultDiv = document.getElementById("transformation-result");
+    resultDiv.innerText = `Original: ${currentSequence.join(" - ")}`;
+    currentTransformationSequence = [...currentSequence];
     console.log("Transformation als neues Original gespeichert:", currentSequence);
+}
+
+// Verlauf anzeigen
+function updateHistoryView() {
+    const historyList = document.getElementById("history-list");
+    historyList.innerHTML = "";
+    history.forEach((entry, idx) => {
+        const div = document.createElement("div");
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.gap = "10px";
+        div.style.background = idx === 0 ? "#ffe066" : "#f8f9fa";
+        div.style.borderRadius = "8px";
+        div.style.padding = "6px 12px";
+        div.style.fontWeight = idx === 0 ? "bold" : "normal";
+        div.innerHTML = `<span style="min-width:90px;color:#888;">${entry.type}:</span> ${entry.row.join(" - ")}`;
+        historyList.appendChild(div);
+    });
 }
 
 function calculateInterval(toneA, toneB) {
