@@ -496,7 +496,7 @@ function isMobileDevice() {
 
 window.addEventListener("DOMContentLoaded", () => {
     if (isMobileDevice()) {
-        document.body.style.zoom = "1.5";
+        document.body.style.zoom = "1.2";
     } else {
         document.body.style.zoom = "0.8";
     }
