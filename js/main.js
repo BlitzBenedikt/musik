@@ -32,9 +32,6 @@ function setupControls() {
         <button class="red-stop" onclick="stopPlayback()" title="Stoppt die Wiedergabe">
             &#9632;
         </button>
-        <button class="green-check" onclick="validateSequence()" title="Überprüft, ob die Reihenfolge gültig ist">
-            &#10003;
-        </button>
     `;
 }
 function setupPlaySettings() {
