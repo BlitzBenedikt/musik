@@ -113,6 +113,12 @@
             background-color: #181a1b;
             color: #f1f1f1;
         }
+        body.darkmode button,
+        body.darkmode .primary,
+        body.darkmode .secondary {
+            background: unset !important;
+            color: unset !important;
+        }
         body.darkmode .draggable {
             background: #23272b;
             color: #f1f1f1;
@@ -126,21 +132,16 @@
             background-color: #ffd700 !important;
             color: #23272b;
         }
-        body.darkmode button {
-            background: linear-gradient(90deg, #222 60%, #444 100%);
-            color: #f1f1f1;
-        }
-        body.darkmode .primary {
-            background-color: #222;
-        }
-        body.darkmode .secondary {
-            background-color: #444;
-        }
-        body.darkmode input[type="number"] {
-            background: #23272b;
-            color: #f1f1f1;
-            border: 1px solid #444;
-        }
+        body.darkmode #history-list div {
+    color: #fff;
+    background: #23272b !important;
+}
+body.darkmode #history-list div:first-child {
+    background: #3a3f44 !important;
+}
+body.darkmode #history-list span {
+    color: #ffd700;
+}
 
         /* Responsive Anpassung für Mobilgeräte */
         @media (max-width: 600px) {
@@ -730,6 +731,20 @@ function updateHistoryView() {
         div.style.padding = "6px 12px";
         div.style.fontWeight = idx === 0 ? "bold" : "normal";
         div.innerHTML = `<span style="min-width:90px;color:#888;">${entry.type}:</span> ${entry.row.join(" - ")}`;
+
+        // Laden-Button
+        const loadBtn = document.createElement("button");
+        loadBtn.textContent = "Laden";
+        loadBtn.className = "secondary";
+        loadBtn.style.marginLeft = "auto";
+        loadBtn.onclick = () => {
+            currentSequence = [...entry.row];
+            displayTones(currentSequence);
+            displayTransformation(entry.type, currentSequence); 
+            updateHistoryView();
+        };
+
+        div.appendChild(loadBtn);
         historyList.appendChild(div);
     });
 }
