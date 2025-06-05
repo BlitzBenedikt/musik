@@ -488,3 +488,17 @@ function markInvalidIntervals(sequence) {
     }
 }
 
+// iOS/iPadOS: Audio-Kontext nach User-Interaktion aktivieren
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('mousedown', unlockAudio, { once: true });
+
+function unlockAudio() {
+    // Erzeuge einen leeren Ton, um das Audio-System zu aktivieren
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createBufferSource();
+    source.buffer = ctx.createBuffer(1, 1, 22050);
+    source.connect(ctx.destination);
+    source.start(0);
+    setTimeout(() => ctx.close(), 100);
+}
+
