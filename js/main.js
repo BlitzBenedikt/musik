@@ -365,11 +365,8 @@ function playTransformation() {
             playTone(tone);
             if (index === currentTransformationSequence.length - 1) {
                 setTimeout(() => {
-                    if (currentAudio) {
-                        currentAudio.pause();
-                        currentAudio.currentTime = 0;
-                        currentAudio = null;
-                    }
+                    audioElement.pause();
+                    audioElement.currentTime = 0;
                     toneElements.forEach(el => el.classList.remove("playing"));
                 }, delay - 50);
             }
