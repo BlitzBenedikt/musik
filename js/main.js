@@ -70,11 +70,14 @@ function preloadAudios() {
     });
 }
 function playTone(tone) {
+    if (!audioCache[tone]) {
+        audioCache[tone] = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
+    }
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
     }
-    currentAudio = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
+    currentAudio = audioCache[tone];
     currentAudio.currentTime = 0;
     currentAudio.play().catch(e => {
         console.warn("Audio konnte nicht abgespielt werden:", e);
