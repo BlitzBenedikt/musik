@@ -141,11 +141,8 @@ function displayTones(sequence) {
             div.classList.add("playing");
             const delay = parseInt(document.getElementById("play-delay").value, 10);
             setTimeout(() => {
-                if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                    currentAudio = null;
-                }
+                audioElement.pause();
+                audioElement.currentTime = 0;
                 div.classList.remove("playing");
             }, delay - 50);
             console.log("Ton abgespielt:", tone);
@@ -344,11 +341,8 @@ function playSequence() {
             console.log("Ton abgespielt in Sequenz:", tone);
             if (index === currentSequence.length - 1) {
                 setTimeout(() => {
-                    if (currentAudio) {
-                        currentAudio.pause();
-                        currentAudio.currentTime = 0;
-                        currentAudio = null;
-                    }
+                    audioElement.pause();
+                    audioElement.currentTime = 0;
                     toneElements.forEach(el => el.classList.remove("playing"));
                 }, delay - 50);
             }
@@ -388,11 +382,8 @@ function playTransformation() {
 function stopPlayback() {
     playbackTimeouts.forEach(timeout => clearTimeout(timeout));
     playbackTimeouts = [];
-    if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-        currentAudio = null;
-    }
+    audioElement.pause();
+    audioElement.currentTime = 0;
     const toneListDiv = document.getElementById("tone-list");
     if (toneListDiv) {
         Array.from(toneListDiv.children).forEach(el => el.classList.remove("playing"));
