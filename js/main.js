@@ -41,7 +41,7 @@ function setupPlaySettings() {
     const playSettings = document.getElementById("play-settings");
     playSettings.innerHTML = `
         <label for="play-delay">Zeit pro Ton (ms):</label>
-        <input type="number" id="play-delay" value="1000" min="100">
+        <input type="number" id="play-delay" value="1000" min="300">
     `;
 }
 function setupTransformationSection() {
@@ -66,22 +66,21 @@ function setupTransformationSection() {
 function preloadAudios() {
     tones.forEach(tone => {
         const audio = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
-        audioCache[tone] = audio;
+        audio.load();
     });
 }
+const audioElement = new Audio();
+
 function playTone(tone) {
-    if (!audioCache[tone]) {
-        audioCache[tone] = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
-    }
-    if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-    }
-    currentAudio = audioCache[tone];
-    currentAudio.currentTime = 0;
-    currentAudio.play().catch(e => {
-        console.warn("Audio konnte nicht abgespielt werden:", e);
-    });
+    audioElement.pause();
+    audioElement.currentTime = 0;
+    audioElement.src = `audio/${tone.replace('#', 'sharp')}.wav`;
+    // iOS braucht manchmal ein .play() nach src-Änderung mit kurzem Timeout
+    setTimeout(() => {
+        audioElement.play().catch(e => {
+            console.warn("Audio konnte nicht abgespielt werden:", e);
+        });
+    }, 50);
 }
 
 // --- Zwölftonreihe ---
