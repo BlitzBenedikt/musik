@@ -153,8 +153,6 @@ function displayTones(sequence) {
 
 // --- Transformationen ---
 function displayTransformation(type, sequence) {
-    // NICHT displayTones(sequence);
-    // NICHT markInvalidIntervals(sequence);
     const resultDiv = document.getElementById("transformation-result");
     resultDiv.innerText = `${type}: ${sequence.join(" - ")}`;
     currentTransformationSequence = sequence;
@@ -243,7 +241,7 @@ function updateCurrentSequence() {
     currentSequence = Array.from(toneListDiv.children).map(child => child.innerText);
     history.unshift({ type: "Manuell", row: [...currentSequence] });
     updateHistoryView();
-    markInvalidIntervals(currentSequence); // <--- HIER
+    markInvalidIntervals(currentSequence); 
     console.log("Aktuelle Reihenfolge nach Drag & Drop:", currentSequence);
 }
 
