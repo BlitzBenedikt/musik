@@ -490,3 +490,15 @@ function unlockAudio() {
     setTimeout(() => ctx.close(), 100);
 }
 
+function isMobileDevice() {
+    return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    if (isMobileDevice()) {
+        document.body.style.zoom = "1.5";
+    } else {
+        document.body.style.zoom = "0.8";
+    }
+});
+
