@@ -8,17 +8,19 @@ let currentTransformationSequence = [];
 let history = []; // Verlauf der Reihen
 
 // --- UI Setup ---
-window.onload = () => {
+document.addEventListener("DOMContentLoaded", () => {
     setupControls();
     setupPlaySettings();
     setupTransformationSection();
-    preloadAudios();
     generateTones(true);
-    document.getElementById("darkmode-toggle").onclick = function() {
-        document.body.classList.toggle("darkmode");
-        this.innerText = document.body.classList.contains("darkmode") ? "☀️" : "🌙";
-    };
-};
+    const toggle = document.getElementById("darkmode-toggle");
+    if (toggle) {
+        toggle.onclick = function () {
+            document.body.classList.toggle("darkmode");
+            this.innerText = document.body.classList.contains("darkmode") ? "☀️" : "🌙";
+        };
+    }
+});
 
 function setupControls() {
     const controls = document.getElementById("controls");
@@ -60,24 +62,36 @@ function setupTransformationSection() {
 }
 
 // --- Audio ---
-function preloadAudios() {
-    tones.forEach(tone => {
-        const audio = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
-        audio.load();
-    });
+function getAudioForTone(tone) {
+    const key = tone;
+    if (audioCache[key]) return audioCache[key];
+    const audio = new Audio(`audio/${tone.replace('#', 'sharp')}.wav`);
+    audio.preload = "auto";
+    audioCache[key] = audio;
+    return audio;
 }
-const audioElement = new Audio();
+
+function stopCurrentAudio() {
+    if (currentAudio) {
+        try {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        } catch (_) {
+            // ignore
+        }
+    }
+}
 
 function playTone(tone) {
-    audioElement.pause();
-    audioElement.currentTime = 0;
-    audioElement.src = `audio/${tone.replace('#', 'sharp')}.wav`;
-    // iOS braucht manchmal ein .play() nach src-Änderung mit kurzem Timeout
+    stopCurrentAudio();
+    const audio = getAudioForTone(tone);
+    currentAudio = audio;
     setTimeout(() => {
-        audioElement.play().catch(e => {
+        audio.currentTime = 0;
+        audio.play().catch(e => {
             console.warn("Audio konnte nicht abgespielt werden:", e);
         });
-    }, 50);
+    }, 20);
 }
 
 // --- Zwölftonreihe ---
@@ -138,8 +152,7 @@ function displayTones(sequence) {
             div.classList.add("playing");
             const delay = parseInt(document.getElementById("play-delay").value, 10);
             setTimeout(() => {
-                audioElement.pause();
-                audioElement.currentTime = 0;
+                stopCurrentAudio();
                 div.classList.remove("playing");
             }, delay - 50);
             console.log("Ton abgespielt:", tone);
@@ -336,8 +349,7 @@ function playSequence() {
             console.log("Ton abgespielt in Sequenz:", tone);
             if (index === currentSequence.length - 1) {
                 setTimeout(() => {
-                    audioElement.pause();
-                    audioElement.currentTime = 0;
+                    stopCurrentAudio();
                     toneElements.forEach(el => el.classList.remove("playing"));
                 }, delay - 50);
             }
@@ -362,8 +374,7 @@ function playTransformation() {
             playTone(tone);
             if (index === currentTransformationSequence.length - 1) {
                 setTimeout(() => {
-                    audioElement.pause();
-                    audioElement.currentTime = 0;
+                    stopCurrentAudio();
                     toneElements.forEach(el => el.classList.remove("playing"));
                 }, delay - 50);
             }
@@ -374,8 +385,7 @@ function playTransformation() {
 function stopPlayback() {
     playbackTimeouts.forEach(timeout => clearTimeout(timeout));
     playbackTimeouts = [];
-    audioElement.pause();
-    audioElement.currentTime = 0;
+    stopCurrentAudio();
     const toneListDiv = document.getElementById("tone-list");
     if (toneListDiv) {
         Array.from(toneListDiv.children).forEach(el => el.classList.remove("playing"));
